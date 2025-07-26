@@ -1,6 +1,7 @@
 from agents import (
     Agent,
     GuardrailFunctionOutput,
+    OutputGuardrailTripwireTriggered,
     RunContextWrapper,
     Runner,
     TResponseInputItem,
@@ -177,138 +178,44 @@ async def injury_support_guardrail(
 # ========================
 # Output Guardrails
 # ========================
-
 @output_guardrail
 async def health_output_guardrail(
     ctx: RunContextWrapper,
     agent: Agent,
-    output: MessageOutput
+    output: str  # 👈 updated type hint to make it clear it's a string
 ) -> GuardrailFunctionOutput:
     """
     Guardrail that checks if the health-related response is safe for users.
-    Triggers the tripwire if the response is deemed unsafe.
+    Triggers the tripwire if the response is deemed unsafe or contains dangerous phrases.
     """
     result = await Runner.run(
         health_output_agent,
-        output,
+        output,  # 👈 no .response here
         context=ctx.context,
         run_config=config
     )
 
+    # Check whether agent marked it safe
     is_safe_response = getattr(result.final_output, "is_safe_response", False)
 
-    # Optional: Logging for debugging
-    # print(f"[Health Guardrail] Safe: {is_safe_response}, Output: {result.final_output.dict()}")
+    # Check for dangerous keywords manually
+    reasoning = getattr(result.final_output, "reasoning", "").lower()
+    dangerous_phrases = [
+        "you will die", "end your life", "kill yourself",
+        "no hope", "refuse treatment", "don't go to hospital"
+    ]
 
-    return GuardrailFunctionOutput(
-    output_info={
-        **result.final_output.dict(),
-        "metadata": {
-            "guardrail": "health_output_guardrail",
-            "reason": "response marked unsafe"
-        }
-    },
-    tripwire_triggered=not is_safe_response
-)
+    if any(phrase in reasoning for phrase in dangerous_phrases):
+        raise OutputGuardrailTripwireTriggered("⚠️ Dangerous phrase detected in reasoning.")
 
-
-
-@output_guardrail
-async def escalation_output_guardrail(
-    ctx: RunContextWrapper,
-    agent: Agent,
-    output: MessageOutput
-) -> GuardrailFunctionOutput:
-    """
-    Guardrail that determines whether the output is a valid health-related query.
-    Triggers the tripwire if the response is not classified as a health query.
-    """
-    result = await Runner.run(
-        escalation_output_agent,
-        output,
-        context=ctx.context,
-        run_config=config
-    )
-
-    is_health_query = getattr(result.final_output, "is_health_query", False)
-
+    # Return GuardrailFunctionOutput
     return GuardrailFunctionOutput(
         output_info={
             **result.final_output.dict(),
             "metadata": {
-                "guardrail": "escalation_output_guardrail",
-                "reason": "response marked unsafe"
+                "guardrail": "health_output_guardrail",
+                "reason": "response marked unsafe" if not is_safe_response else "safe"
             }
         },
-        tripwire_triggered=not is_health_query
-    )
-
-
-
-@output_guardrail
-async def injury_support_output_guardrail(
-    ctx: RunContextWrapper,
-    agent: Agent,
-    output: MessageOutput
-) -> GuardrailFunctionOutput:
-    """
-    Guardrail that determines whether the output requires escalation 
-    based on injury severity or emergency recommendation.
-    Triggers tripwire if escalation is recommended.
-    """
-    result = await Runner.run(
-        injury_output_agent,
-        output,
-        context=ctx.context,
-        run_config=config
-    )
-
-    recommend_escalation = getattr(result.final_output, "recommend_escalation", False)
-
-    return GuardrailFunctionOutput(
-        output_info={
-            **result.final_output.dict(),
-            "metadata": {
-                "guardrail": "injury_support_output_guardrail",
-                "reason": "Response suggests escalation due to injury"
-            }
-        },
-        tripwire_triggered=recommend_escalation
-    )
-
-
-from agents import GuardrailFunctionOutput
-
-@output_guardrail
-async def nutrition_output_guardrail(
-    ctx: RunContextWrapper,
-    agent: Agent,
-    output: MessageOutput
-) -> GuardrailFunctionOutput:
-    """
-    Guardrail that ensures the agent's output is nutrition-related.
-    Triggers a tripwire if the content is not relevant to nutrition.
-    """
-
-    # Run the nutrition-specific validator agent
-    result = await Runner.run(
-        nutrition_output_agent,
-        output,
-        context=ctx.context,
-        run_config=config
-    )
-
-    # Check validation result
-    is_nutrition_related = getattr(result.final_output, "is_nutrition_related", False)
-
-    # Return a valid GuardrailFunctionOutput (metadata inside output_info)
-    return GuardrailFunctionOutput(
-        output_info={
-            **result.final_output.dict(),
-            "metadata": {
-                "guardrail": "nutrition_output_guardrail",
-                "reason": "Response was not nutrition-related"
-            }
-        },
-        tripwire_triggered=not is_nutrition_related
+        tripwire_triggered=not is_safe_response
     )

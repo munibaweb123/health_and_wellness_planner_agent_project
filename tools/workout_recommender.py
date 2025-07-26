@@ -1,8 +1,7 @@
-# tools/workout_recommender.py
-import asyncio
-from agents import function_tool, RunContextWrapper
-from typing import Dict, List
-from context import UserSessionContext, WorkoutPlan
+from agents import RunContextWrapper, function_tool
+
+from context import UserSessionContext
+
 
 @function_tool
 async def workout_recommender(
@@ -10,63 +9,54 @@ async def workout_recommender(
     goal: str,
     experience: str = "",
     preferences: str = ""
-) -> Dict:
-    """
-    Suggests a 7-day workout plan based on the user's goals and experience.
-    Stores the structured workout plan in context.
-    """
-    print("📌 [Tool Triggered] workout_recommender")
+) -> str:
+    async def _workout_recommender_inner(context: UserSessionContext) -> str:
+        try:
+            if goal.lower() == "weight loss":
+                recommended_days = [
+                    "Monday: Cardio (45 mins - Running/Cycling)",
+                    "Tuesday: Full body HIIT (30 mins)",
+                    "Wednesday: Light yoga or rest",
+                    "Thursday: Strength training (Upper body)",
+                    "Friday: Cardio + Core workout",
+                    "Saturday: Strength training (Lower body)",
+                    "Sunday: Active rest - walking or stretching"
+                ]
+                intensity = "High"
+            elif goal.lower() == "muscle gain":
+                recommended_days = [
+                    "Monday: Push day (Chest, Shoulders, Triceps)",
+                    "Tuesday: Pull day (Back, Biceps)",
+                    "Wednesday: Legs + Core",
+                    "Thursday: Rest or Active recovery",
+                    "Friday: Full body strength",
+                    "Saturday: Mobility & Flexibility",
+                    "Sunday: Rest"
+                ]
+                intensity = "Moderate to High"
+            else:
+                recommended_days = [
+                    "Monday: 30 min brisk walk",
+                    "Tuesday: 30 min brisk walk",
+                    "Wednesday: 30 min brisk walk",
+                    "Thursday: 30 min brisk walk",
+                    "Friday: 30 min brisk walk",
+                    "Saturday: 30 min brisk walk",
+                    "Sunday: Rest or light stretching"
+                ]
+                intensity = "Low"
 
-    async def _workout_recommender_inner(context: UserSessionContext) -> Dict:
-        # Simple hardcoded logic based on goal
-        if goal.lower() == "weight loss":
-            recommended_days = [
-                "Monday: Cardio (45 mins - Running/Cycling)",
-                "Tuesday: Full body HIIT (30 mins)",
-                "Wednesday: Light yoga or rest",
-                "Thursday: Strength training (Upper body)",
-                "Friday: Cardio + Core workout",
-                "Saturday: Strength training (Lower body)",
-                "Sunday: Active rest - walking or stretching"
-            ]
-            recommended_intensity = "High"
-        elif goal.lower() == "muscle gain":
-            recommended_days = [
-                "Monday: Push day (Chest, Shoulders, Triceps)",
-                "Tuesday: Pull day (Back, Biceps)",
-                "Wednesday: Legs + Core",
-                "Thursday: Rest or Active recovery",
-                "Friday: Full body strength",
-                "Saturday: Mobility & Flexibility",
-                "Sunday: Rest"
-            ]
-            recommended_intensity = "Moderate to High"
-        else:
-            recommended_days = [
-                "Monday: 30 min brisk walk (low intensity)",
-                "Tuesday: 30 min brisk walk (low intensity)",
-                "Wednesday: 30 min brisk walk (low intensity)",
-                "Thursday: 30 min brisk walk (low intensity)",
-                "Friday: 30 min brisk walk (low intensity)",
-                "Saturday: 30 min brisk walk (low intensity)",
-                "Sunday: Rest or light stretching"
-            ]
-            recommended_intensity = "Low"
+            # Save in context
+            plan = WorkoutPlan(days=recommended_days, intensity=intensity)
+            context.workout_plan = [plan.json()]
 
-        # Create a WorkoutPlan object
-        new_workout_plan = WorkoutPlan(
-            days=recommended_days,
-            intensity=recommended_intensity
-        )
-
-        # Store in context (as list of JSON strings)
-        if context:
-            context.workout_plan = [new_workout_plan.json()]
-
-        return {
-            "workout_plan": recommended_days,
-            "intensity": recommended_intensity,
-            "notes": f"Generated for goal '{goal}', experience '{experience}', preferences '{preferences}'"
-        }
+            return (
+                f"Workout Plan for goal: {goal}\n"
+                f"Intensity: {intensity}\n\n" +
+                "\n".join(recommended_days)
+            )
+        except Exception as e:
+            print("❌ Tool internal error:", e)
+            return "Error occurred while generating workout plan."
 
     return await ctx.run(_workout_recommender_inner)

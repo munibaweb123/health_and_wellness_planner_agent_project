@@ -22,7 +22,7 @@ async def main():
         # ✅ Now pass the dynamic context
         response = await Runner.run(
             health_agent,
-            "I wanna lose 2kg weight as a job worker, I prefer keto diet, suggest some workout plan and meal plan",
+            "I wanna lose 2kg weight as a job worker, I prefer vegetarian diet, suggest some workout plan and meal plan",
             context=user_context,
             run_config=config
         )

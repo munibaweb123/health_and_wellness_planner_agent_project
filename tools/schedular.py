@@ -1,18 +1,12 @@
 from agents import function_tool
-from datetime import datetime, timedelta
+from pydantic import BaseModel
 from typing import List
 
+class ScheduleOutput(BaseModel):
+    schedule: str
+
 @function_tool
-async def schedular(goal: str) -> str:
-    """
-    Creates a basic 7-day schedule based on the user's goal.
-    
-    Args:
-        goal (str): The goal for scheduling (e.g., 'lose weight', 'build muscle', 'study for exam').
-    
-    Returns:
-        str: A formatted weekly schedule.
-    """
+async def schedular(goal: str) -> ScheduleOutput:
     print("📌 [Tool Triggered] schedular")
 
     def generate_schedule_for_goal(goal: str) -> List[str]:
@@ -55,4 +49,4 @@ async def schedular(goal: str) -> str:
 
     schedule = generate_schedule_for_goal(goal)
     formatted_schedule = "\n".join(schedule)
-    return f"🗓️ Weekly Schedule for '{goal.title()}':\n\n{formatted_schedule}"
+    return ScheduleOutput(schedule=f"🗓️ Weekly Schedule for '{goal.title()}':\n\n{formatted_schedule}")
